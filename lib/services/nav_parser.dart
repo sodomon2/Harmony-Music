@@ -323,11 +323,12 @@ Playlist parsePlaylist(Map<String, dynamic> data) {
   };
 
   var subtitle = data['subtitle'];
-  if (subtitle.containsKey('runs')) {
+  if (subtitle != null && subtitle.containsKey('runs')) {
     var runs = subtitle['runs'];
     playlist['description'] = runs.map((run) => run['text']).join('');
-    if (runs.length == 3 && RegExp(r'\d+ ').hasMatch(nav(data, subtitle2))) {
-      playlist['count'] = nav(data, subtitle2).split(' ')[0];
+    var subtitle2Text = nav(data, subtitle2);
+    if (runs.length == 3 && subtitle2Text != null && RegExp(r'\d+ ').hasMatch(subtitle2Text)) {
+      playlist['count'] = subtitle2Text.split(' ')[0];
       playlist['author'] = parseSongArtistsRuns(runs.sublist(0, 1));
     }
   }

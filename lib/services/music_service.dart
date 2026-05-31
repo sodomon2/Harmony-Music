@@ -660,67 +660,84 @@ class MusicServices extends getx.GetxService {
 
     String? type;
 
-    for (var res in results) {
-      String category;
-      if (res['musicShelfRenderer'] != null) {
-        dynamic itemResults = res['musicShelfRenderer']['contents'];
-        String? typeFilter = filter;
-        category = "mixed"; // Just a default value
-        final mixedItems = parseSearchResults(itemResults,
-            ['artist', 'playlist', 'song', 'video', 'station'], type, category);
-        if (filter == null) {
-          for (var item in mixedItems) {
-            final itemType = item.runtimeType == MediaItem
-                ? (item.artist.split(",")[0]) + "s"
-                : "${item.runtimeType}s";
-            if (searchResults.containsKey(itemType) &&
-                (searchResults[itemType]).length < 3) {
-              (searchResults[itemType] as List).add(item);
-            } else if (!searchResults.containsKey(itemType)) {
-              searchResults[itemType] = [item];
+    String? typeFilter = filter;
+    type = typeFilter?.substring(0, typeFilter.length - 1).toLowerCase();
+
+    if (filter == null) {
+      List<dynamic> mixedItemResults = [];
+      for (var res in results) {
+        if (res['musicShelfRenderer'] != null) {
+          mixedItemResults.addAll(res['musicShelfRenderer']['contents']);
+        } else if (res['itemSectionRenderer'] != null) {
+          var itemContents = res['itemSectionRenderer']['contents'];
+          if (itemContents != null && itemContents.isNotEmpty) {
+            if (itemContents[0]['musicResponsiveListItemRenderer'] != null) {
+              mixedItemResults.add(itemContents[0]);
             }
           }
-        } else {
-          category = nav(res, ['musicShelfRenderer', ...title_text]);
+        }
+      }
+
+      if (mixedItemResults.isNotEmpty) {
+        String category = "mixed";
+        final mixedItems = parseSearchResults(mixedItemResults,
+            ['artist', 'playlist', 'song', 'video', 'station'], type, category);
+        for (var item in mixedItems) {
+          String itemType;
+          if (item.runtimeType == MediaItem) {
+             String artistStr = item.artist ?? "Song";
+             itemType = artistStr.split(",")[0] + "s";
+          } else {
+             itemType = "${item.runtimeType}s";
+          }
+          
+          if (searchResults.containsKey(itemType) &&
+              (searchResults[itemType] as List).length < 3) {
+            (searchResults[itemType] as List).add(item);
+          } else if (!searchResults.containsKey(itemType)) {
+            searchResults[itemType] = [item];
+          }
+        }
+      }
+    } else {
+      for (var res in results) {
+        String category;
+        if (res['musicShelfRenderer'] != null) {
+          category = nav(res, ['musicShelfRenderer', ...title_text]) ?? "mixed";
           searchResults[category] = parseSearchResults(
               res['musicShelfRenderer']['contents'],
               ['artist', 'playlist', 'song', 'video', 'station'],
               type,
               category);
-        }
-        type = typeFilter?.substring(0, typeFilter.length - 1).toLowerCase();
-      } else {
-        continue;
-      }
 
-      if (filter != null) {
-        requestFunc(additionalParams) async =>
-            (await _sendRequest("search", data,
-                    additionalParams: additionalParams))
-                .data;
-        parseFunc(contents) => parseSearchResults(contents,
-            ['artist', 'playlist', 'song', 'video', 'station'], type, category);
+          requestFunc(additionalParams) async =>
+              (await _sendRequest("search", data,
+                      additionalParams: additionalParams))
+                  .data;
+          parseFunc(contents) => parseSearchResults(contents,
+              ['artist', 'playlist', 'song', 'video', 'station'], type, category);
 
-        if (searchResults.containsKey(category)) {
-          final x = await getContinuations(
-              res['musicShelfRenderer'],
-              'musicShelfContinuation',
-              limit - ((searchResults[category] as List).length),
-              requestFunc,
-              parseFunc,
-              isAdditionparamReturnReq: true);
+          if (searchResults.containsKey(category)) {
+            final x = await getContinuations(
+                res['musicShelfRenderer'],
+                'musicShelfContinuation',
+                limit - ((searchResults[category] as List).length),
+                requestFunc,
+                parseFunc,
+                isAdditionparamReturnReq: true);
 
-          searchResults["params"] = {
-            'data': data,
-            "type": type,
-            "category": category,
-            'additionalParams': x[1],
-          };
+            searchResults["params"] = {
+              'data': data,
+              "type": type,
+              "category": category,
+              'additionalParams': x[1],
+            };
 
-          searchResults[category] = [
-            ...(searchResults[category] as List),
-            ...(x[0])
-          ];
+            searchResults[category] = [
+              ...(searchResults[category] as List),
+              ...(x[0])
+            ];
+          }
         }
       }
     }
